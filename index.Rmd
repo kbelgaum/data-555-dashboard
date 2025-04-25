@@ -1,0 +1,173 @@
+---
+title: "DATA 555 Dashboard"
+author: "Kanak Belgaum"
+date: "2025-04-24"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+---
+
+Page 1
+===========================================================================
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(pacman)
+p_load(rio, dplyr, here, ggplot2, DT, plotly, flexdashboard, bslib)
+here::i_am("index.Rmd")
+
+cases_manica_4 <- rio::import(here("cases_manica_4.csv"))
+
+cases_manica_555 <- cases_manica_4 |>
+  select("record_number", "gender", "patient_age", "pavilion_name_new",
+         "HIV_all", "BMI_level", "grouped_cats")
+
+
+# choose variables to include for widget
+
+cases_manica_555 <- cases_manica_4 |>
+  select("record_number", "gender", "patient_age", "pavilion_name_new",
+         "BMI_level", "grouped_cats")
+```
+
+
+Row 1 {data-height=500}
+--------------------------------------------------------------------------------
+
+### HTML Widget 1: Stacked Bar Chart of TB Cases by Pavilion {.column width=6}
+
+
+```{r bar, echo=FALSE}
+
+cases_summary <- cases_manica_555 |>
+  filter(!pavilion_name_new %in% c("Missing", "Other")) |>
+  count(pavilion_name_new, grouped_cats,, name = "Count")
+
+stacked_bar <- ggplot(data=cases_summary,
+                      aes(
+                          x=pavilion_name_new,
+                          y=Count,
+                          fill=grouped_cats,
+                          text = paste(
+                            "Pavilion:", pavilion_name_new, "<br>",
+                            "Diagnosis:", grouped_cats, "<br>",
+                            "Count:", Count))) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c(
+    "bacT+ Sputum" = "#8B0000",
+    "Clinically Diagnosed" = "#DAA520",
+    "Unlikely to Have TB" = "#3498DB"
+  )) +
+  labs(
+    title = "TB Diagnoses by Housing Pavilion",
+    x="Housing Pavilion",
+    y="Count",
+    fill="TB Diagnosis",
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplotly(stacked_bar, tooltip = "text")
+```
+
+### Key Takeaways:{.column width=6}
+
+This interactive stacked bar chart allows the user to easily view the distribution of bacteriologically confirmed and clinically diagnosed TB cases across all housing pavilions in the prison (along with all negative cases). With the tooltip, users can hover over the different colored sections to see the exact count of individuals in each group. Comparing these counts with the total population of each pavilion may give the user a sense of potential clustering of TB cases.
+
+Row 2 {data-height=500}
+--------------------------------------------------------------------------------
+
+### Key Takeaways: {.column width=6}
+
+Key Takeaways: This interactive histogram allows the user to easily view the proportion of bacteriologically confirmed and clinically diagnosed TB cases across each bin of incarceration durations in the prison. With the tooltip, users can hover over the bars to see the exact proportion of cases in each group. Comparing these proportions may give the sense of how TB rates change over time residents spend in the correctional facility.
+
+### HTML Widget 2: Proportional Distribution of TB Cases by Time Incarcerated {.column width=6}
+
+```{r bartwo, echo=FALSE}
+
+cases_manica_5 <- rio::import(here("cases_manica_5.csv"))
+
+names(cases_manica_5) <- make.names(names(cases_manica_5), unique = TRUE)
+
+cases_binned_incarc <- cases_manica_5 %>%
+  mutate(incarc_bin = cut(time_incarcerated,
+                          breaks = seq(0, max(time_incarcerated, na.rm = TRUE), by = 2),
+                          right = FALSE)) %>%
+  group_by(incarc_bin) %>%
+  summarise(
+    total = n(),
+    tb_cases = sum(clindx_or_bact_case == "1"),
+    prop_tb = tb_cases / total
+  ) %>%
+  filter(!is.na(incarc_bin))
+
+# Step 2: Plot proportion of TB cases per incarceration bin
+bar_ti <- ggplot(cases_binned_incarc, aes(x = incarc_bin, y = prop_tb,
+                                          text = paste0(
+                                            "Bin: ", incarc_bin, "<br>",
+                                            "Proportion TB: ", round(prop_tb, 2), "<br>",
+                                            "Total cases: ", total
+                                          ))) +
+          geom_col(fill = "#990000") +
+  labs(
+    title = "Proportion of TB Cases by Time Incarcerated",
+    x = "Years Incarcerated (Binned)",
+    y = "Proportion Diagnosed w/ TB"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplotly(bar_ti, tooltip = "text")
+```
+
+
+
+Row 3 {data-height=500}
+---------------------------------------------------------------------------------
+
+### HTML Widget 3: Interactive Datatable {.column width=6}
+
+
+```{r datatable, echo=FALSE}
+cases_datatable <- datatable(
+  cases_manica_555, rownames = FALSE,
+  extensions = 'Buttons', options = list(
+    dom = 'Bfrtip',
+    buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+  )
+)
+
+cases_datatable
+```
+
+Page 2
+===========================================================================
+
+### Dataset Description
+
+Data for this dashboard was sourced from a currently private research project
+conducted by Emory University's Center for the Health of Incarcerated Persons,
+the National Penitentiary Service of Mozambique, and Health Through Walls. This 
+data was collected in a mass screening of nearly 2,000 residents of Manica
+Regional Prison, Mozambique. The screening took place from March 18th - April
+1st, 2024.
+
+### Real World Impact and Importance
+
+This dashboard is important because improved diagnostic capacity is much needed 
+in high-burden TB countries, like Mozambique. Understanding what factors lead to 
+positive TB diagnosis, specifically in a congregate setting, can help improve 
+these tools.
+
+[Link to GitHub repository](https://github.com/kbelgaum/data-555-dashboard)
+
+
+
+
+
+
+
+
+
+
